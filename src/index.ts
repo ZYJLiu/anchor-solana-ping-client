@@ -1,17 +1,17 @@
 import * as anchor from "@project-serum/anchor"
+import * as fs from "fs"
+import dotenv from "dotenv"
+dotenv.config()
 import idl from "./idl.json"
 
 async function main() {
-  // generate keypair for payer
-  const payer = anchor.web3.Keypair.generate()
-
   // create connection to devnet
   const connection = new anchor.web3.Connection(
     anchor.web3.clusterApiUrl("devnet")
   )
 
-  // call airdrop helper function to fund payer keypair
-  await airdrop(connection, payer)
+  // initialize keypair using helper function
+  const payer = await initializeKeypair(connection)
 
   // create Wallet object from payer keypair
   const wallet = new anchor.Wallet(payer)
@@ -41,24 +41,37 @@ async function main() {
   await incrementCounter(wallet, counter, program)
 }
 
-async function airdrop(
-  connection: anchor.web3.Connection,
-  payer: anchor.web3.Keypair
+async function initializeKeypair(
+  connection: anchor.web3.Connection
+): Promise<anchor.web3.Keypair> {
+  if (!process.env.PRIVATE_KEY) {
+    console.log("Creating .env file")
+    const keypair = anchor.web3.Keypair.generate()
+    fs.writeFileSync(".env", `PRIVATE_KEY=[${keypair.secretKey.toString()}]`)
+    await airdropSolIfNeeded(keypair, connection)
+
+    return keypair
+  }
+
+  const secret = JSON.parse(process.env.PRIVATE_KEY ?? "") as number[]
+  const secretKey = Uint8Array.from(secret)
+  const keypairFromSecretKey = anchor.web3.Keypair.fromSecretKey(secretKey)
+  return keypairFromSecretKey
+}
+
+async function airdropSolIfNeeded(
+  payer: anchor.web3.Keypair,
+  connection: anchor.web3.Connection
 ) {
-  // call requestAirdrop
-  const transactionSignature = await connection.requestAirdrop(
+  console.log("Airdropping 1 SOL...")
+  const signature = await connection.requestAirdrop(
     payer.publicKey,
     anchor.web3.LAMPORTS_PER_SOL * 1
   )
+  await connection.confirmTransaction(signature)
 
-  // confirm requestAirdrop transaction
-  await connection.confirmTransaction(transactionSignature)
-
-  // check balance
-  const balance =
-    (await connection.getBalance(payer.publicKey)) /
-    anchor.web3.LAMPORTS_PER_SOL
-  console.log("SOL Balance After Airdrop", balance)
+  const balance = await connection.getBalance(payer.publicKey)
+  console.log("Current balance is", balance / anchor.web3.LAMPORTS_PER_SOL)
 }
 
 async function createCounter(
