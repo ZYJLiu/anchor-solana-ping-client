@@ -37,6 +37,25 @@ async function main() {
     "4EgPRavdTMXD42zssM74oAFR8Ea6Upjt2snyNdsiUaFw"
   )
 
+  const counterKeypairOne = anchor.web3.Keypair.generate()
+  const counterKeypairTwo = anchor.web3.Keypair.generate()
+  const counterKeyPairThree = anchor.web3.Keypair.generate()
+
+  // using .instruction
+  await createCounterInstruction(connection, payer, counterKeypairOne, program)
+
+  // using .transaction
+  await createCounterTransaction(connection, payer, counterKeypairTwo, program)
+
+  // using .rpc
+  await createCounterRpc(wallet, counterKeyPairThree, program)
+
+  // using .rpc
+  await incrementRpc(wallet, counterKeyPairThree.publicKey, program)
+
+  // using .rpc
+  await decrementRpc(wallet, counterKeyPairThree.publicKey, program)
+
   // using .instruction
   await incrementInstruction(connection, payer, counter, program)
 
@@ -45,6 +64,15 @@ async function main() {
 
   // using .rpc
   await incrementRpc(wallet, counter, program)
+
+  // using .instruction
+  await decrementInstruction(connection, payer, counter, program)
+
+  // using .transaction
+  await decrementTransaction(connection, payer, counter, program)
+
+  // using .rpc
+  await decrementRpc(wallet, counter, program)
 }
 
 async function initializeKeypair(): Promise<anchor.web3.Keypair> {
@@ -85,6 +113,86 @@ async function airdropSol(
   // get new balance after airdrop
   const balance = await connection.getBalance(payer.publicKey)
   console.log("Current balance is", balance / anchor.web3.LAMPORTS_PER_SOL)
+}
+
+async function createCounterInstruction(
+  connection: anchor.web3.Connection,
+  payer: anchor.web3.Keypair,
+  counter: anchor.web3.Keypair,
+  program: anchor.Program
+) {
+  const instruction = await program.methods
+    .create()
+    .accounts({
+      counter: counter.publicKey,
+      user: payer.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .signers([payer, counter])
+    .instruction()
+
+  const transaction = new anchor.web3.Transaction().add(instruction)
+
+  const transactionSignature = await anchor.web3.sendAndConfirmTransaction(
+    connection,
+    transaction,
+    [payer, counter]
+  )
+
+  await connection.confirmTransaction(transactionSignature)
+
+  console.log(
+    `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
+  )
+}
+
+async function createCounterTransaction(
+  connection: anchor.web3.Connection,
+  payer: anchor.web3.Keypair,
+  counter: anchor.web3.Keypair,
+  program: anchor.Program
+) {
+  const transaction = await program.methods
+    .create()
+    .accounts({
+      counter: counter.publicKey,
+      user: payer.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .signers([payer, counter])
+    .transaction()
+
+  const transactionSignature = await anchor.web3.sendAndConfirmTransaction(
+    connection,
+    transaction,
+    [payer, counter]
+  )
+
+  await connection.confirmTransaction(transactionSignature)
+
+  console.log(
+    `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
+  )
+}
+
+async function createCounterRpc(
+  wallet: anchor.Wallet,
+  counter: anchor.web3.Keypair,
+  program: anchor.Program
+) {
+  const transactionSignature = await program.methods
+    .create()
+    .accounts({
+      counter: counter.publicKey,
+      user: wallet.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .signers([counter])
+    .rpc()
+
+  console.log(
+    `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
+  )
 }
 
 async function incrementInstruction(
@@ -158,6 +266,89 @@ async function incrementRpc(
   // send transaction
   const transactionSignature = await program.methods
     .increment()
+    .accounts({
+      counter: counter,
+      user: wallet.publicKey,
+    })
+    .signers([])
+    .rpc()
+
+  console.log(
+    `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
+  )
+}
+
+async function decrementInstruction(
+  connection: anchor.web3.Connection,
+  payer: anchor.web3.Keypair,
+  counter: anchor.web3.PublicKey,
+  program: anchor.Program
+) {
+  // create instruction
+  const instruction = await program.methods
+    .decrement()
+    .accounts({
+      counter: counter,
+      user: payer.publicKey,
+    })
+    .signers([payer])
+    .instruction()
+
+  // create transaction
+  const transaction = new anchor.web3.Transaction().add(instruction)
+
+  // send transaction
+  const transactionSignature = await anchor.web3.sendAndConfirmTransaction(
+    connection,
+    transaction,
+    [payer]
+  )
+
+  await connection.confirmTransaction(transactionSignature)
+
+  console.log(
+    `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
+  )
+}
+
+async function decrementTransaction(
+  connection: anchor.web3.Connection,
+  payer: anchor.web3.Keypair,
+  counter: anchor.web3.PublicKey,
+  program: anchor.Program
+) {
+  // create transaction
+  const transaction = await program.methods
+    .decrement()
+    .accounts({
+      counter: counter,
+      user: payer.publicKey,
+    })
+    .signers([payer])
+    .transaction()
+
+  // send transaction
+  const transactionSignature = await anchor.web3.sendAndConfirmTransaction(
+    connection,
+    transaction,
+    [payer]
+  )
+
+  await connection.confirmTransaction(transactionSignature)
+
+  console.log(
+    `Transaction: https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`
+  )
+}
+
+async function decrementRpc(
+  wallet: anchor.Wallet,
+  counter: anchor.web3.PublicKey,
+  program: anchor.Program
+) {
+  // send transaction
+  const transactionSignature = await program.methods
+    .decrement()
     .accounts({
       counter: counter,
       user: wallet.publicKey,
