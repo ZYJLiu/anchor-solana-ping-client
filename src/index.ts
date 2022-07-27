@@ -1,5 +1,4 @@
 import * as anchor from "@project-serum/anchor"
-import idl from "./idl.json"
 
 async function main() {}
 
